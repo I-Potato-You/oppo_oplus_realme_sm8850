@@ -13,7 +13,7 @@ read -p "请输入自定义内核后缀（默认：android16-5-g8c67d4274c0a-ab1
 CUSTOM_SUFFIX=${CUSTOM_SUFFIX:-android16-5-g8c67d4274c0a-ab14275539-4k}
 read -p "是否启用susfs？(y/n，默认：y): " APPLY_SUSFS
 APPLY_SUSFS=${APPLY_SUSFS:-y}
-read -p "是否启用 KPM？(b-(re)sukisu内置kpm, k-kernelpatch next独立kpm实现, n-关闭kpm，默认：n): " USE_PATCH_LINUX
+read -p "是否启用 KPM？(y-启用 KpatchNext独立kpm实现, n-关闭kpm，默认：n): " USE_PATCH_LINUX
 USE_PATCH_LINUX=${USE_PATCH_LINUX:-n}
 read -p "KSU分支版本(r=ReSukiSU, y=SukiSU Ultra, n=KernelSU Next, k=KSU, l=lkm模式(无内置KSU), 默认：r): " KSU_BRANCH
 KSU_BRANCH=${KSU_BRANCH:-r}
@@ -46,21 +46,13 @@ else
   KSU_TYPE="no KSU"
 fi
 
-if [[ "$USE_PATCH_LINUX" == "b" || "$USE_PATCH_LINUX" == "B" ]]; then
-  KPM_TYPE="builtin"
-elif [[ "$USE_PATCH_LINUX" == "k" || "$USE_PATCH_LINUX" == "K" ]]; then
-  KPM_TYPE="KernelPatch Next"
-else
-  KPM_TYPE="no kpm"
-fi
-
 echo
 echo "===== 配置信息 ====="
 echo "适用机型: $MANIFEST"
 echo "自定义内核后缀: -$CUSTOM_SUFFIX"
 echo "KSU分支版本: $KSU_TYPE"
 echo "启用susfs: $APPLY_SUSFS"
-echo "启用 KPM: $KPM_TYPE"
+echo "启用 KPM: $USE_PATCH_LINUX"
 echo "应用 lz4&zstd 补丁: $APPLY_LZ4"
 echo "应用 lz4kd 补丁: $APPLY_LZ4KD"
 echo "应用网络功能增强优化配置: $APPLY_BETTERNET"
@@ -250,14 +242,15 @@ echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DEFCONFIG_FILE"
 #跳过将uapi标准头安装到 usr/include 目录的不必要操作，节省编译时间
 echo "CONFIG_HEADERS_INSTALL=n" >> "$DEFCONFIG_FILE"
 
+# 应用 CVE_2026_43499 修复补丁
+cd common
+wget https://github.com/cctv18/oppo_oplus_realme_sm8850/raw/refs/heads/main/other_patch/cve-2026-43499-rtmutex-6.12.patch
+patch -p1 -F 3 < cve-2026-43499-rtmutex-6.12.patch
+cd ..
+
 # 6.12内核Rust配置
 echo "CONFIG_RUST=y" >> ./common/arch/arm64/configs/gki_defconfig
 echo "CONFIG_ANDROID_BINDER_IPC_RUST=m" >> ./common/arch/arm64/configs/gki_defconfig
-
-# 仅在启用了 KPM 时添加 KPM 支持
-if [[ "$USE_PATCH_LINUX" == [bB] && $KSU_BRANCH == [yYrR] ]]; then
-  echo "CONFIG_KPM=y" >> "$DEFCONFIG_FILE"
-fi
 
 # 仅在启用了 LZ4KD 补丁时添加相关算法支持
 if [[ "$APPLY_LZ4KD" == "y" || "$APPLY_LZ4KD" == "Y" ]]; then
@@ -331,6 +324,7 @@ if [[ "$APPLY_DROIDSPACES" == [sSeE] ]]; then
   # 开启 Droidspaces 容器所需内核支持
   echo "CONFIG_PID_NS=y" >> "$DEFCONFIG_FILE"
   echo "CONFIG_IPC_NS=y" >> "$DEFCONFIG_FILE"
+  echo "CONFIG_USER_NS=y" >> "$DEFCONFIG_FILE"
   echo "CONFIG_SYSVIPC=y" >> "$DEFCONFIG_FILE"
   echo "CONFIG_DEVTMPFS=y" >> "$DEFCONFIG_FILE"
   echo "CONFIG_NAMESPACES=y" >> "$DEFCONFIG_FILE"
@@ -358,11 +352,11 @@ if [[ "$APPLY_DROIDSPACES" == [sSeE] ]]; then
     # 开启 systemd-coredump 支持
     echo "CONFIG_STATIC_USERMODEHELPER=n" >> "$DEFCONFIG_FILE"
     # 添加 Lindroid EVDI DRM 驱动
-    echo "CONFIG_DRM_LINDROID_EVDI=y" >> "$DEFCONFIG_FILE"
-    cd common
-    wget https://github.com/cctv18/oppo_oplus_realme_sm8850/raw/refs/heads/main/droidspaces_patch/evdi_drm.patch
-    patch -p1 -F 3 < evdi_drm.patch || true
-    cd ..
+    # echo "CONFIG_DRM_LINDROID_EVDI=y" >> "$DEFCONFIG_FILE"
+    # cd common
+    # wget https://github.com/cctv18/oppo_oplus_realme_sm8850/raw/refs/heads/main/droidspaces_patch/evdi_drm.patch
+    # patch -p1 -F 3 < evdi_drm.patch || true
+    # cd ..
   fi
 fi
 
@@ -457,16 +451,7 @@ echo ">>> 内核编译成功！"
 # ===== 选择使用 patch_linux (KPM补丁)=====
 WORKDIR="$SCRIPT_DIR"
 OUT_DIR="$WORKDIR/kernel_workspace/common/out/arch/arm64/boot"
-if [[ "$USE_PATCH_LINUX" == [bB] && $KSU_BRANCH == [yYrR] ]]; then
-  echo ">>> 使用 patch_linux 工具处理输出..."
-  cd "$OUT_DIR"
-  wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/latest/download/patch_linux
-  chmod +x patch_linux
-  ./patch_linux
-  rm -f Image
-  mv oImage Image
-  echo ">>> 已成功打上KPM补丁!"
-elif [[ "$USE_PATCH_LINUX" == [kK] ]]; then
+if [[ "$USE_PATCH_LINUX" == [yY] ]]; then
   echo ">>> 使用 kptools-linux 工具处理输出..."
   cd "$OUT_DIR"
   wget https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kptools-linux
@@ -476,8 +461,6 @@ elif [[ "$USE_PATCH_LINUX" == [kK] ]]; then
   rm -f Image
   mv oImage Image
   echo ">>> 已成功打上KP-N补丁!"
-else
-  echo ">>> 跳过 KPM 修补操作..."
 fi
 
 # ===== 克隆并打包 AnyKernel3 =====
@@ -499,7 +482,7 @@ if [[ "$APPLY_LZ4KD" == "y" || "$APPLY_LZ4KD" == "Y" ]]; then
   wget https://raw.githubusercontent.com/cctv18/oppo_oplus_realme_sm8850/refs/heads/main/zram.zip
 fi
 
-if [[ "$USE_PATCH_LINUX" == [kK] ]]; then
+if [[ "$USE_PATCH_LINUX" == [yY] ]]; then
   wget https://github.com/cctv18/KPatch-Next/releases/latest/download/kpn.zip
 fi
 
@@ -515,7 +498,7 @@ fi
 if [[ "$APPLY_LZ4" == "y" || "$APPLY_LZ4" == "Y" ]]; then
   ZIP_NAME="${ZIP_NAME}-lz4-zstd"
 fi
-if [[ "$USE_PATCH_LINUX" == [bBkK] ]]; then
+if [[ "$USE_PATCH_LINUX" == [yY] ]]; then
   ZIP_NAME="${ZIP_NAME}-kpm"
 fi
 if [[ "$APPLY_BBR" == "y" || "$APPLY_BBR" == "Y" ]]; then

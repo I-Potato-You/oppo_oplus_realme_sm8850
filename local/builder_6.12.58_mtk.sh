@@ -6,9 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # ===== 设置自定义参数 =====
-echo "===== 新版米系/欧加真通用 6.12.23 GKI内核本地编译脚本 By Coolapk@cctv18 ====="
+echo "===== 欧加真MT6993通用6.12.58 A16 OKI内核本地编译脚本 By Coolapk@cctv18 ====="
 echo ">>> 读取用户配置..."
-MANIFEST=${MANIFEST:-oppo+oplus+realme+mi}
+MANIFEST=${MANIFEST:-oppo+oplus+realme}
 read -p "请输入自定义内核后缀（默认：android16-5-ge7f2a9832757-ab13799791-4k）: " CUSTOM_SUFFIX
 CUSTOM_SUFFIX=${CUSTOM_SUFFIX:-android16-5-ge7f2a9832757-ab13799791-4k}
 read -p "是否启用susfs？(y/n，默认：y): " APPLY_SUSFS
@@ -91,9 +91,9 @@ mkdir kernel_workspace
 cd kernel_workspace
 
 echo "正在克隆源码仓库..."
-aria2c -s16 -x16 -k1M https://github.com/cctv18/android_gki_kernel_common/archive/refs/heads/android16-6.12-2025-06.zip -o common.zip &&
-unzip -q common.zip &&
-mv "android_gki_kernel_common-android16-6.12-2025-06" common &&
+aria2c -s16 -x16 -k1M ttps://github.com/cctv18/android_kernel_oneplus_mt6993/archive/refs/heads/oneplus/mt6993_b_16.0_ace_6_ultra.zip -o common.zip && 
+unzip -q common.zip && 
+mv "android_kernel_oneplus_mt6993-oneplus-mt6993_b_16.0_ace_6_ultra" common &&
 rm -rf common.zip &
 
 echo "正在克隆llvm-clang19工具链..." &&
@@ -135,7 +135,7 @@ echo "CONFIG_LOCALVERSION_AUTO=n" >> ./common/arch/arm64/configs/gki_defconfig
 if [[ $KSU_BRANCH == [yYrR] ]]; then
   echo ">>> 拉取 ReSukiSU 并设置版本（由于SukiSU长期未维护无法正常编译，且ReSukiSU兼容sukisu管理器，故SukiSU源码仓库已重定向为resukisu）..."
   curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-  echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@南城定制内核"' >> ./common/arch/arm64/configs/gki_defconfig
+  echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@cctv18"' >> ./common/arch/arm64/configs/gki_defconfig
 elif [[ "$KSU_BRANCH" == "n" || "$KSU_BRANCH" == "N" ]]; then
   echo ">>> 拉取 KernelSU Next 并设置版本..."
   curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/refs/heads/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
